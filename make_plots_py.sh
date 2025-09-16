@@ -9,28 +9,24 @@ from collections import defaultdict
 
 base = pathlib.Path("/home/user/lab5")
 infile = base / ("watch_mem.csv")
-# если передали путь первым аргументом — используем его
 import sys
 if len(sys.argv) > 1:
     infile = pathlib.Path(sys.argv[1])
 
 ts_fmt = "%Y-%m-%d %H:%M:%S"
 
-# ---- читаем watch_mem.csv
-sys_rows = []              # (ts, MemFree, MemAvail, SwapFree)
-rss_mem, rss_mem2 = [], [] # (ts, RSS_kB)
-cpu_mem, cpu_mem2 = [], [] # (ts, CPU)
+sys_rows = []
+rss_mem, rss_mem2 = [], []
+cpu_mem, cpu_mem2 = [], []
 
 with infile.open(newline="") as f:
     rd = csv.DictReader(f)
     for r in rd:
         ts = dt.datetime.strptime(r["ts"], ts_fmt)
-        # системные (одна строка на ts)
         try:
             sys_rows.append((ts, int(r["MemFree_kB"]), int(r["MemAvail_kB"]), int(r["SwapFree_kB"])))
         except Exception:
             pass
-        # строки по процессам
         cmd = r.get("COMMAND","")
         try:
             rss = int(r["RSS_KB"]); cpu = float(r["CPU_PCT"])
@@ -41,10 +37,8 @@ with infile.open(newline="") as f:
         elif "mem.bash" in cmd:
             rss_mem.append((ts, rss)); cpu_mem.append((ts, cpu))
 
-# сортировка по времени
 sys_rows.sort(); rss_mem.sort(); rss_mem2.sort(); cpu_mem.sort(); cpu_mem2.sort()
 
-# ---- helper для рисования
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -61,8 +55,6 @@ def save_lines(xy_list, labels, title, ylabel, outfile):
     plt.tight_layout()
     plt.savefig(outfile)
     plt.close()
-
-# 1) Системная память
 if sys_rows:
     xs = [t for t,_,_,_ in sys_rows]
     y1 = [m for _,m,_,_ in sys_rows]
@@ -72,7 +64,6 @@ if sys_rows:
                ["MemFree_kB","MemAvailable_kB","SwapFree_kB"],
                "Динамика системной памяти", "kB", base/"sys_mem.png")
 
-# 2) RSS процессов
 if rss_mem and rss_mem2:
     xs1, y1 = zip(*rss_mem)
     xs2, y2 = zip(*rss_mem2)
@@ -83,7 +74,7 @@ elif rss_mem:
     xs1, y1 = zip(*rss_mem)
     save_lines([(xs1,y1)], ["mem.bash"], "RSS (резидентная память) процесса", "RSS, kB", base/"rss_mem.png")
 
-# 3) %CPU процессов
+
 if cpu_mem and cpu_mem2:
     xs1, y1 = zip(*cpu_mem)
     xs2, y2 = zip(*cpu_mem2)
@@ -94,7 +85,6 @@ elif cpu_mem:
     xs1, y1 = zip(*cpu_mem)
     save_lines([(xs1,y1)], ["mem.bash"], "%CPU процесса", "%CPU", base/"cpu_mem.png")
 
-# 4) Рост размера массива из report*.log (ось X — индекс строки)
 def load_report(p):
     if not p.exists(): return None
     vals=[]
